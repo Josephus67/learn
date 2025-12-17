@@ -1,6 +1,6 @@
 import os
 import sys
-import yt_dlp
+from pytube import YouTube
 from faster_whisper import WhisperModel
 import re
 import shutil
@@ -10,29 +10,23 @@ def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
 def download_audio(youtube_url, output_dir="."):
-    """Downloads audio from YouTube URL and converts to WAV."""
+    """Downloads audio from YouTube URL using pytube."""
     print(f"⬇️  Downloading audio from {youtube_url}...")
     
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
-        'quiet': True,
-        'no_warnings': True,
-    }
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
-            filename = ydl.prepare_filename(info)
-            # The file extension changes after post-processing to .wav
-            base, _ = os.path.splitext(filename)
-            final_filename = base + ".wav"
-            return final_filename, info.get('title', 'transcription')
+        yt = YouTube(youtube_url)
+        # Get the highest quality audio stream
+        audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+        
+        if not audio_stream:
+            print("❌ Error: No audio stream found.")
+            return None, None
+
+        # Download
+        out_file = audio_stream.download(output_path=output_dir)
+        print(f"✅ Download complete: {out_file}")
+        
+        return out_file, yt.title
     except Exception as e:
         print(f"❌ Error downloading video: {e}")
         return None, None
