@@ -1,6 +1,6 @@
 import os
 import sys
-from pytube import YouTube
+from pytubefix import YouTube
 from faster_whisper import WhisperModel
 import re
 import shutil
@@ -10,11 +10,23 @@ def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
 def download_audio(youtube_url, output_dir="."):
-    """Downloads audio from YouTube URL using pytube."""
+    """Downloads audio from YouTube URL using pytubefix."""
     print(f"⬇️  Downloading audio from {youtube_url}...")
     
     try:
-        yt = YouTube(youtube_url)
+        # Try to use oauth
+        # use_oauth=True: triggers the OAuth flow if needed
+        # allow_oauth_cache=True: caches the token for future uses
+        yt = YouTube(youtube_url, use_oauth=True, allow_oauth_cache=True)
+        
+        def on_progress(stream, chunk, bytes_remaining):
+            # Optional: print progress
+            pass
+            
+        yt.register_on_progress_callback(on_progress)
+
+        print(f"ℹ️  Fetching video info for: {youtube_url}")
+        # Accessing streams triggers the auth flow if needed
         # Get the highest quality audio stream
         audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
         
@@ -22,6 +34,7 @@ def download_audio(youtube_url, output_dir="."):
             print("❌ Error: No audio stream found.")
             return None, None
 
+        print(f"✅ Found audio stream: {audio_stream}")
         # Download
         out_file = audio_stream.download(output_path=output_dir)
         print(f"✅ Download complete: {out_file}")
@@ -29,6 +42,8 @@ def download_audio(youtube_url, output_dir="."):
         return out_file, yt.title
     except Exception as e:
         print(f"❌ Error downloading video: {e}")
+        if "428" in str(e) or "Precondition Required" in str(e):
+             print("\n⚠️  Authentication required! Please run the script in an interactive terminal and follow the instructions to sign in.")
         return None, None
 
 def transcribe_audio(audio_path, model_name="base"):
@@ -106,9 +121,8 @@ def main():
         return
 
     # 2. Transcribe
-    # Using 'medium' model as per your previous script preference, 
-    # but you can change to 'base' or 'small' for speed.
-    transcription = transcribe_audio(audio_file, model_name="medium")
+    # Using 'base' model for speed. Change to 'medium' or 'large' for better accuracy.
+    transcription = transcribe_audio(audio_file, model_name="base")
     
     if transcription:
         # 3. Save

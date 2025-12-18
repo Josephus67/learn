@@ -1,3 +1,3 @@
 faster-whisper
-pytube2
+pytubefix
 
